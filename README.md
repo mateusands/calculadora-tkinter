@@ -1,11 +1,11 @@
-# 🧮 Calculadora em Python (Tkinter)
+# Calculadora em Python (Tkinter)
 
 Calculadora simples desenvolvida em **Python** utilizando a biblioteca **Tkinter**, com interface gráfica e botões funcionais.  
 Projeto com foco em aprendizado de GUI, organização de código e versionamento com Git/GitHub.
 
 ---
 
-## ✨ Funcionalidades
+## Funcionalidades
 
 - Interface gráfica simples e intuitiva
 - Operações básicas:
@@ -19,7 +19,7 @@ Projeto com foco em aprendizado de GUI, organização de código e versionamento
 
 ---
 
-## 🛠️ Tecnologias utilizadas
+## Tecnologias utilizadas
 
 - Python 3
 - Tkinter (biblioteca padrão do Python)
