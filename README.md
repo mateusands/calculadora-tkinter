@@ -13,8 +13,8 @@ Projeto com foco em aprendizado de GUI, organização de código e versionamento
   - Subtração (-)
   - Multiplicação (X)
   - Divisão (/)
-- Botões numéricos e operadores com cores diferentes
-- Botão **C (Limpar)** destacado em vermelho suave
+- Botões numéricos e operadores
+- Botão **C (Limpar)**
 - Tratamento básico de erros (expressões inválidas)
 
 ---
