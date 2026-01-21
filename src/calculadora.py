@@ -1,22 +1,34 @@
 import tkinter as tk
 
+resultado_mostrado = False
+
 def clicar(valor):
+    resetar_se_resultado()
     if valor == "X":
         entrada.insert(tk.END, "*")
     else:
         entrada.insert(tk.END, valor)
 
+def resetar_se_resultado():
+    global resultado_mostrado
+    if resultado_mostrado:
+        entrada.delete(0, tk.END)
+        resultado_mostrado = False
+
 def limpar():
     entrada.delete(0, tk.END)
 
 def calcular():
+    global resultado_mostrado
     try:
         resultado = eval(entrada.get())
         entrada.delete(0, tk.END)
         entrada.insert(tk.END, resultado)
+        resultado_mostrado = True
     except:
         entrada.delete(0, tk.END)
         entrada.insert(tk.END, "Erro")
+        resultado_mostrado = True
 
 # Interface Gráfica
 janela = tk.Tk()
