@@ -1,1 +1,2 @@
-python>=3.10
+# Sem dependências externas — o projeto usa apenas a biblioteca padrão (tkinter).
+# Requer Python 3.10+ e o Tk instalado no sistema (ver README).
