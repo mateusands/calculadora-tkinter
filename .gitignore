@@ -4,3 +4,9 @@ __pycache__/
 .vscode/
 dist/
 build/
+# Caderno de bordo local das sessões (skill finalizar-sessao)
+.claude/sessions/
+
+# Ambiente virtual e cache do pytest
+.venv/
+.pytest_cache/

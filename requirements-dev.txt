@@ -1,0 +1,3 @@
+# Dependências de desenvolvimento — o app em si não tem nenhuma.
+#   pip install -r requirements-dev.txt
+pytest>=8.0
