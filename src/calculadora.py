@@ -1,5 +1,7 @@
 import tkinter as tk
 
+from expressao import avaliar
+
 resultado_mostrado = False
 
 def clicar(valor):
@@ -20,15 +22,10 @@ def limpar():
 
 def calcular():
     global resultado_mostrado
-    try:
-        resultado = eval(entrada.get())
-        entrada.delete(0, tk.END)
-        entrada.insert(tk.END, resultado)
-        resultado_mostrado = True
-    except:
-        entrada.delete(0, tk.END)
-        entrada.insert(tk.END, "Erro")
-        resultado_mostrado = True
+    resultado = avaliar(entrada.get())
+    entrada.delete(0, tk.END)
+    entrada.insert(tk.END, resultado)
+    resultado_mostrado = True
 
 # Interface Gráfica
 janela = tk.Tk()
