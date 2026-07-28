@@ -20,6 +20,8 @@ import operator
 
 RESULTADO_ERRO = "Erro"
 
+OPERADORES = ("+", "-", "*", "/")
+
 # Allowlist: fora daqui, nada é aceito.
 _OPERACOES_BINARIAS = {
     ast.Add: operator.add,
@@ -48,6 +50,18 @@ def avaliar(expressao: str) -> str:
         return RESULTADO_ERRO
 
 
+def deve_reiniciar(visor: str, tecla: str) -> bool:
+    """Com um resultado no visor, decide se a próxima tecla começa expressão nova.
+
+    Dígito e ponto reiniciam (quem digita `5` depois de `4` quer `5`, não `45`).
+    Operador continua a conta a partir do resultado — é o encadeamento. Resultado
+    que não é número ("Erro") nunca é encadeável: reiniciar sempre.
+    """
+    if tecla not in OPERADORES:
+        return True
+    return not _e_numero(visor)
+
+
 def _calcular(no: ast.AST) -> float:
     """Percorre a árvore recusando tudo que não seja aritmética.
 
@@ -69,3 +83,11 @@ def _calcular(no: ast.AST) -> float:
         return operacao(_calcular(no.operand))
 
     raise ValueError(f"expressão não é aritmética: {type(no).__name__}")
+
+
+def _e_numero(texto: str) -> bool:
+    try:
+        float(texto)
+        return True
+    except ValueError:
+        return False

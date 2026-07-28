@@ -26,7 +26,7 @@ REGRA DE NEGÓCIO
 
 import pytest
 
-from expressao import RESULTADO_ERRO, avaliar
+from expressao import RESULTADO_ERRO, avaliar, deve_reiniciar
 
 
 class TestOperacoesBasicas:
@@ -125,3 +125,34 @@ class TestContinuidadeDoResultado:
         # Se o visor mostra "Erro" e o usuário insiste no "=", continua "Erro"
         # (a UI limpa o visor no próximo dígito, mas o "=" repetido cai aqui).
         assert avaliar(RESULTADO_ERRO) == RESULTADO_ERRO
+
+
+class TestReinicioDoVisorAposResultado:
+    """Com um resultado no visor, a próxima tecla continua ou recomeça a conta?
+
+    A decisão é regra de negócio, não detalhe de widget: por isso mora aqui e
+    não dentro do callback do botão. `calcular()` marca que o visor exibe um
+    resultado; `clicar()` pergunta a esta função o que fazer com ele.
+    """
+
+    @pytest.mark.parametrize("tecla", ["0", "5", "9", "."])
+    def test_deve_reiniciar_quando_a_tecla_e_digito_ou_ponto(self, tecla):
+        # 2+2= mostra 4; digitar 5 tem de mostrar 5, nunca 45.
+        assert deve_reiniciar("4", tecla) is True
+
+    @pytest.mark.parametrize("tecla", ["+", "-", "*", "/"])
+    def test_nao_deve_reiniciar_quando_a_tecla_e_operador(self, tecla):
+        # 2+2= mostra 4; apertar + tem de continuar a conta a partir do 4.
+        assert deve_reiniciar("4", tecla) is False
+
+    def test_deve_reiniciar_quando_o_visor_mostra_erro(self):
+        # "Erro+3" só produziria outro "Erro" — encadear a partir de erro não faz
+        # sentido, mesmo com operador.
+        assert deve_reiniciar(RESULTADO_ERRO, "+") is True
+
+    def test_deve_permitir_encadear_resultado_com_casa_decimal(self):
+        # O resultado da divisão vem como "4.0" — continua sendo número.
+        assert deve_reiniciar("4.0", "+") is False
+
+    def test_deve_permitir_encadear_resultado_negativo(self):
+        assert deve_reiniciar("-10", "*") is False

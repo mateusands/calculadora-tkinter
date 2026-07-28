@@ -1,24 +1,29 @@
 import tkinter as tk
 
-from expressao import avaliar
+from expressao import avaliar, deve_reiniciar
 
 resultado_mostrado = False
 
 def clicar(valor):
-    resetar_se_resultado()
-    if valor == "X":
-        entrada.insert(tk.END, "*")
-    else:
-        entrada.insert(tk.END, valor)
+    # O botão mostra "X", mas quem calcula só entende "*" — traduz antes de
+    # qualquer coisa, para a regra receber o operador de verdade.
+    tecla = "*" if valor == "X" else valor
+    resetar_se_resultado(tecla)
+    entrada.insert(tk.END, tecla)
 
-def resetar_se_resultado():
+def resetar_se_resultado(tecla):
     global resultado_mostrado
-    if resultado_mostrado:
+    if not resultado_mostrado:
+        return
+    # Dígito recomeça a conta; operador continua a partir do resultado.
+    if deve_reiniciar(entrada.get(), tecla):
         entrada.delete(0, tk.END)
-        resultado_mostrado = False
+    resultado_mostrado = False
 
 def limpar():
+    global resultado_mostrado
     entrada.delete(0, tk.END)
+    resultado_mostrado = False
 
 def calcular():
     global resultado_mostrado
