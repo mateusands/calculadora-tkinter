@@ -22,6 +22,11 @@ RESULTADO_ERRO = "Erro"
 
 OPERADORES = ("+", "-", "*", "/")
 
+# O que pode entrar no visor pela digitação. Parênteses entram porque são
+# aritmética legítima e o avaliador os resolve — não há botão, mas quem digita
+# `(2+3)*4` merece que funcione. Fora daqui, a tecla é recusada.
+CARACTERES_DIGITAVEIS = frozenset("0123456789.+-*/()")
+
 # Allowlist: fora daqui, nada é aceito.
 _OPERACOES_BINARIAS = {
     ast.Add: operator.add,
@@ -60,6 +65,20 @@ def deve_reiniciar(visor: str, tecla: str) -> bool:
     if tecla not in OPERADORES:
         return True
     return not _e_numero(visor)
+
+
+def pode_digitar(texto: str) -> bool:
+    """Diz se `texto` pode ficar no visor enquanto o usuário digita ou cola.
+
+    Vale para o que VEM DE FORA (tecla, Ctrl+V). O que a própria calculadora
+    escreve no visor — `"Erro"`, `"inf"` — não passa por aqui: é resultado, não
+    digitação.
+
+    É a segunda camada, não a única: `**` passa neste filtro (os dois
+    caracteres são válidos) e ainda assim é recusado por `avaliar()`. O filtro
+    decide o que é digitável; a allowlist do `ast` decide o que é calculável.
+    """
+    return all(caractere in CARACTERES_DIGITAVEIS for caractere in texto)
 
 
 def apagar_ultimo(visor: str) -> str:

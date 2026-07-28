@@ -1,7 +1,7 @@
 import tkinter as tk
 import tkinter.font as tkfont
 
-from expressao import apagar_ultimo, avaliar, deve_reiniciar
+from expressao import apagar_ultimo, avaliar, deve_reiniciar, pode_digitar
 
 resultado_mostrado = False
 
@@ -46,24 +46,33 @@ def resetar_se_resultado(tecla):
 
 def limpar():
     global resultado_mostrado
-    entrada.delete(0, tk.END)
+    escrever_no_visor("")
     resultado_mostrado = False
 
 def apagar():
     global resultado_mostrado
-    visor = apagar_ultimo(entrada.get())
-    entrada.delete(0, tk.END)
-    entrada.insert(tk.END, visor)
+    escrever_no_visor(apagar_ultimo(entrada.get()))
     # O que sobrou virou expressão em edição, não resultado — sem isto, o
     # próximo dígito limparia o campo em vez de continuar de onde parou.
     resultado_mostrado = False
 
 def calcular():
     global resultado_mostrado
-    resultado = avaliar(entrada.get())
-    entrada.delete(0, tk.END)
-    entrada.insert(tk.END, resultado)
+    escrever_no_visor(avaliar(entrada.get()))
     resultado_mostrado = True
+
+def escrever_no_visor(texto):
+    """Troca o conteúdo do visor SEM passar pelo filtro de digitação.
+
+    O filtro (`pode_digitar`) existe para o que vem de fora — tecla e Ctrl+V.
+    O que a própria calculadora devolve é resultado, não digitação, e precisa
+    aparecer mesmo tendo letra: sem desligar a validação aqui, o Tk recusaria a
+    própria mensagem `"Erro"` e o visor ficaria vazio no lugar dela.
+    """
+    entrada.configure(validate="none")
+    entrada.delete(0, tk.END)
+    entrada.insert(tk.END, texto)
+    entrada.configure(validate="key")
 
 def escolher_fonte(*familias):
     """Primeira família instalada, para o app não depender de uma fonte só.
@@ -109,6 +118,13 @@ entrada = tk.Entry(
 entrada.pack(fill="x", ipady=6)
 entrada.focus_set()
 
+# Filtro de digitação: `%P` é o texto que o campo TERIA depois da tecla — se
+# `pode_digitar` recusar, o Tk descarta a edição e a letra nunca aparece. Vale
+# para tecla e para Ctrl+V, que chega como uma inserção só.
+entrada.configure(
+    validate="key",
+    validatecommand=(janela.register(pode_digitar), "%P"),
+)
 
 
 # Filete no lugar da borda do Entry — marca o visor sem enquadrá-lo.

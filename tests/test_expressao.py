@@ -21,6 +21,8 @@ REGRA DE NEGÓCIO
   - Qualquer erro (sintaxe, divisão por zero, nome desconhecido) vira "Erro".
   - Apagar é caractere a caractere (botão ⌫), diferente do "C", que zera tudo.
     "Erro" é a exceção: não é expressão, então apagar limpa o visor inteiro.
+  - O visor só aceita caractere de aritmética. Letra digitada ou colada NÃO
+    entra no campo — não é rejeitada só no "=", é barrada na digitação.
   - SÓ ARITMÉTICA das quatro operações (+ - * /), com sinal unário. Qualquer
     outra construção Python — chamada de função, comparação, potência, texto,
     nome — é expressão inválida e vira "Erro". A calculadora não é um
@@ -30,7 +32,13 @@ REGRA DE NEGÓCIO
 
 import pytest
 
-from expressao import RESULTADO_ERRO, apagar_ultimo, avaliar, deve_reiniciar
+from expressao import (
+    RESULTADO_ERRO,
+    apagar_ultimo,
+    avaliar,
+    deve_reiniciar,
+    pode_digitar,
+)
 
 
 class TestOperacoesBasicas:
@@ -194,3 +202,45 @@ class TestApagarUltimoCaractere:
     def test_deve_permitir_corrigir_um_resultado(self):
         # 12×8= mostra 96; o ⌫ deixa 9, que segue sendo o começo de outra conta.
         assert apagar_ultimo("96") == "9"
+
+
+class TestFiltroDeDigitacao:
+    """Nada além de aritmética entra no visor.
+
+    O campo é editável — dá para digitar e colar nele. Antes, `q` entrava e só
+    virava "Erro" no "=": o usuário via a letra no visor de uma calculadora.
+    Agora a tecla é recusada na hora, e o visor nunca exibe algo impossível.
+
+    Isto NÃO substitui a allowlist de `avaliar()` — é a segunda camada. A
+    primeira decide o que é calculável; esta decide o que é digitável.
+    """
+
+    @pytest.mark.parametrize(
+        "texto",
+        ["", "7", "12", "1.5", "2+3", "10-2", "6*7", "8/2", "(2+3)*4", "-5"],
+    )
+    def test_deve_aceitar_o_que_e_aritmetica(self, texto):
+        assert pode_digitar(texto) is True
+
+    @pytest.mark.parametrize(
+        "texto, motivo",
+        [
+            ("q", "letra solta — o caso que apareceu no visor"),
+            ("2+q", "letra no meio da expressão"),
+            ("abc", "palavra"),
+            ("__import__('os')", "código Python colado"),
+            ("1e400", "notação científica não é digitável (o 'e' é letra)"),
+            ("2 + 3", "espaço"),
+            ("R$ 5", "símbolo qualquer"),
+            ("5\n", "quebra de linha colada"),
+        ],
+    )
+    def test_deve_recusar_o_que_nao_e_aritmetica(self, texto, motivo):
+        assert pode_digitar(texto) is False, f"deveria recusar: {motivo}"
+
+    def test_o_filtro_nao_substitui_o_avaliador(self):
+        # `**` passa no filtro (os dois caracteres são válidos) e mesmo assim é
+        # recusado no cálculo. As duas camadas existem porque nenhuma sozinha
+        # cobre o que a outra cobre.
+        assert pode_digitar("2**3") is True
+        assert avaliar("2**3") == RESULTADO_ERRO
