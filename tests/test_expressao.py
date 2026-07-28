@@ -17,6 +17,11 @@ REGRA DE NEGÓCIO
   - Divisão devolve float: "4/2" resulta em "2.0", não "2". É o comportamento
     atual, herdado do `eval`, e está documentado como pendência no CLAUDE.md.
   - Qualquer erro (sintaxe, divisão por zero, nome desconhecido) vira "Erro".
+  - SÓ ARITMÉTICA das quatro operações (+ - * /), com sinal unário. Qualquer
+    outra construção Python — chamada de função, comparação, potência, texto,
+    nome — é expressão inválida e vira "Erro". A calculadora não é um
+    interpretador: o visor é um campo de texto editável, então tudo o que o
+    usuário digitar ou colar chega até aqui.
 """
 
 import pytest
@@ -63,9 +68,51 @@ class TestTratamentoDeErro:
     def test_nunca_deve_levantar_excecao(self):
         # O visor é o único canal de erro — exceção aqui derrubaria o callback
         # do botão e deixaria a janela viva porém inerte, sem feedback nenhum.
-        for entrada in ["", "((((", "1/0", "None+1", "]" * 50, "9" * 500]:
+        # `exit()` está na lista de propósito: ele levanta SystemExit, que NÃO é
+        # subclasse de Exception e por isso escapa de um `except Exception:`.
+        for entrada in ["", "((((", "1/0", "None+1", "]" * 50, "9" * 500, "exit()"]:
             resultado = avaliar(entrada)
             assert isinstance(resultado, str)
+
+
+class TestApenasAritmetica:
+    """O visor é editável: o usuário pode digitar e colar texto livre nele.
+
+    Tudo o que não for as quatro operações precisa virar "Erro" ANTES de ser
+    executado — senão a calculadora vira um interpretador Python.
+    """
+
+    @pytest.mark.parametrize(
+        "expressao, motivo",
+        [
+            ("__import__('os').getcwd()", "chamada de função embutida"),
+            ("exit()", "encerra o processo (SystemExit)"),
+            ("open('/etc/passwd').read()", "acesso a arquivo"),
+            ("1==1", "comparação — a calculadora não tem booleano"),
+            ("2**32", "potência não é operação da calculadora"),
+            ("7//2", "divisão inteira não é operação da calculadora"),
+            ("7%2", "resto não é operação da calculadora"),
+            ("'ab'*3", "texto, não número"),
+            ("True", "booleano, não número"),
+            ("None", "nome embutido"),
+            ("[1,2][0]", "lista e indexação"),
+            ("(lambda: 1)()", "função anônima"),
+        ],
+    )
+    def test_deve_devolver_erro_quando_a_expressao_nao_e_aritmetica(self, expressao, motivo):
+        assert avaliar(expressao) == RESULTADO_ERRO, f"deveria recusar: {motivo}"
+
+    def test_nao_deve_executar_efeito_colateral(self, tmp_path):
+        # Se a expressão for executada de fato, o arquivo aparece — e aí o visor
+        # deixou de ser uma calculadora e virou execução de código arbitrário.
+        alvo = tmp_path / "invadido.txt"
+        avaliar(f"open({str(alvo)!r}, 'w').write('x')")
+        assert not alvo.exists(), "a expressão foi executada de verdade"
+
+    def test_deve_devolver_erro_sem_travar_em_calculo_explosivo(self):
+        # `9**9**9` com `eval` congela a janela inteira (Tkinter é single-thread)
+        # e não há como cancelar. Recusar a potência resolve na origem.
+        assert avaliar("9**9**9") == RESULTADO_ERRO
 
 
 class TestContinuidadeDoResultado:
