@@ -37,21 +37,49 @@ testes importam só aquele módulo.
 comando = lambda t=texto: clicar(t)
 ```
 
-O argumento default **captura o valor da iteração atual**. Sem ele, todos os 16 botões chamariam
+O argumento default **captura o valor da iteração atual**. Sem ele, todos os 18 botões chamariam
 `clicar` com o valor da **última** iteração — bug clássico de Python em laço. Ao criar botão dentro de
 laço, repita esse padrão.
 
 ### O visor é a única fonte de estado da expressão
 
 Não há variável guardando a expressão — ela vive no texto do `Entry`. A flag `resultado_mostrado` diz se
-o conteúdo atual é um resultado (o próximo dígito limpa o campo, em vez de concatenar). Toda função nova
-que escreve no visor precisa decidir o que fazer com essa flag, senão o comportamento "digitar depois do
-igual" quebra.
+o conteúdo atual é um resultado. O que fazer com ele **não** é decidido no callback: `resetar_se_resultado`
+pergunta a `deve_reiniciar(visor, tecla)`, em `expressao.py` — dígito recomeça a conta, operador encadeia
+a partir do resultado, `"Erro"` nunca encadeia.
 
-### `"X"` é rótulo, `"*"` é operador
+Toda função nova que escreve no visor precisa decidir o que fazer com essa flag, senão o comportamento
+"digitar depois do igual" quebra de forma sutil. `limpar()` e `apagar()` zeram a flag: visor vazio não é
+resultado, e resultado com um dígito a menos virou expressão em edição.
 
-O botão mostra `X` mas insere `*` (`clicar()` faz a tradução). Se adicionar operador com símbolo bonito
-(`÷`, `−`), faça a tradução no mesmo lugar — não deixe símbolo tipográfico chegar ao avaliador.
+### Binding de tecla: o lugar do `bind` é decisão, não detalhe
+
+- **Ação global** (`<Return>`/`<KP_Enter>` → `calcular`) vai na **`janela`**: depois de clicar num botão
+  o foco está nele, e um bind no `entrada` não pegaria.
+- **Ajuste do visor antes da digitação** (`<Key>` → `teclou_no_visor`) vai no **`entrada`**: binding de
+  widget roda antes do da classe, então dá para limpar o campo antes de o caractere entrar.
+
+⚠️ **Filtre a tecla antes de mexer no estado.** `evento.char` do Enter é `"\r"` — sem
+`pode_digitar(evento.char)`, ele passa por dígito e apertar Enter duas vezes limpa o visor antes de
+calcular, devolvendo `"Erro"`. Já aconteceu; o smoke test da UI cobre.
+
+### Escrever no visor é sempre por `escrever_no_visor`
+
+O `Entry` tem filtro de digitação (`validate="key"` + `pode_digitar`), e **o Tk valida também o que o
+programa escreve**. Como `"Erro"` tem letra, um `entrada.insert` direto seria recusado e o visor
+ficaria vazio no lugar da mensagem. `escrever_no_visor` desliga a validação, escreve e religa.
+
+Regra prática: **texto que vem da calculadora** (resultado, erro) usa `escrever_no_visor`; **texto que
+vem do usuário** (a tecla em `clicar`) entra pelo `insert` normal e passa pelo filtro de propósito.
+
+### O rótulo é tipográfico, o operador é ASCII
+
+Os botões mostram `÷ × −`, mas o avaliador só entende `/ * -`. A tradução vive no dicionário `TRADUCAO`,
+aplicado na **primeira linha** de `clicar()` — antes de `resetar_se_resultado`, senão `deve_reiniciar`
+receberia `"×"`, não o reconheceria como operador e o encadeamento quebraria de forma silenciosa.
+
+Operador novo com símbolo bonito entra em `TRADUCAO`. Cuidado: o `−` dos botões é U+2212, **não** o
+hífen do teclado — os dois precisam funcionar, porque o visor também aceita digitação.
 
 ---
 
@@ -60,12 +88,15 @@ O botão mostra `X` mas insere `*` (`clicar()` faz a tradução). Se adicionar o
 `avaliar()`, em `src/expressao.py`, é a função mais delicada do projeto. `calcular()` na UI só delega
 para ela e escreve o resultado no visor.
 
-- **`eval` executa Python arbitrário**, não aritmética. Hoje só o teclado da UI alimenta o campo, então a
-  exposição prática é baixa — mas **qualquer mudança que permita entrada livre** (digitação por teclado
-  físico, colar do clipboard, histórico editável) transforma isso em execução de código. Se for por esse
-  caminho, troque o avaliador **antes** de liberar a entrada: `ast.parse` com allowlist de nós
-  (`BinOp`, `UnaryOp`, `Num`/`Constant`, e só os operadores desejados) é o padrão. Os testes de
-  `TestTratamentoDeErro` já travam o contrato que o avaliador novo tem que cumprir.
+- **Não há `eval` aqui, e não pode voltar a haver.** A expressão é lida com `ast.parse` e percorrida em
+  `_calcular` com allowlist de nós (`Constant` numérico, `BinOp` com `+ - * /`, `UnaryOp` de sinal).
+  O motivo é concreto: o visor é um `Entry` editável, o usuário digita e cola nele: com `eval`, colar
+  `__import__('os').system(...)` e apertar `=` executava o comando. `TestApenasAritmetica` trava isso.
+- **Operador novo = entrada nova na allowlist + teste.** Acrescente em `_OPERACOES_BINARIAS` (ou
+  `_OPERACOES_UNARIAS`) e cubra com teste. Nunca "abra" o parser para resolver um caso.
+- **`**` fica de fora de propósito:** `9**9**9` roda indefinidamente na thread do `mainloop` e congela a
+  janela sem cancelamento possível.
+- **`bool` é subclasse de `int`** — a guarda contra `True+1` em `_calcular` não é decorativa.
 - **`avaliar()` nunca levanta exceção** — expressão inválida vira a string `"Erro"`, porque o visor é o
   único canal de erro da calculadora. Está travado por `test_nunca_deve_levantar_excecao`.
 - **O resultado não é formatado:** `avaliar("4/2")` → `"4.0"` no visor. Se for formatar, cuide dos casos
@@ -99,8 +130,8 @@ importável sem abrir a janela — nada testável deve ir para lá.
 ```python
 # ❌ regra dentro do callback → intestável
 def calcular():
-    resultado = eval(entrada.get())        # a regra está presa na UI
-    ...
+    if entrada.get().endswith("+"):        # a regra está presa na UI
+        ...
 
 # ✅ regra em expressao.py → testável direto
 def avaliar(expressao: str) -> str:
@@ -121,5 +152,6 @@ pytest
 roteiro de `/rodar-local` — em especial o comportamento de digitar logo após um resultado (a flag
 `resultado_mostrado`), que é estado da UI e nenhum teste cobre.
 
-Se for mexer no `eval` (armadilha nº 1 do `CLAUDE.md`), os testes de `TestTratamentoDeErro` já travam o
-contrato: qualquer avaliador novo tem que devolver `"Erro"` nos mesmos casos, sem levantar exceção.
+Se for mexer no avaliador, `TestTratamentoDeErro` e `TestApenasAritmetica` já travam o contrato:
+qualquer versão nova tem que devolver `"Erro"` nos mesmos casos, sem levantar exceção e sem executar
+nada além das quatro operações.

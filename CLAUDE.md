@@ -26,13 +26,16 @@ código e versionamento** — não em completude de funcionalidades.
 
 ```
 calculadora-tkinter/
+├── .github/workflows/
+│   └── testes.yml        # CI: roda pytest no push/PR (sem Tk — a suíte não importa tkinter)
 ├── requirements.txt      # sem deps — só documenta que não há
 ├── requirements-dev.txt  # pytest
 ├── pytest.ini            # pythonpath=src, testpaths=tests
+├── docs/
+│   └── calculadora.png   # screenshot usado no README
 ├── src/
 │   ├── calculadora.py    # UI em nível de módulo (importar ABRE a janela)
-│   ├── expressao.py      # avaliação da expressão — lógica PURA, testável
-│   └── *.png             # screenshots do README
+│   └── expressao.py      # avaliação da expressão — lógica PURA, testável
 └── tests/
     └── test_expressao.py
 ```
@@ -47,14 +50,57 @@ do Python; no Linux é pacote à parte (`sudo pacman -S tk` / `sudo apt install 
 
 **Duas camadas**, separadas justamente para permitir teste:
 
-- **`src/expressao.py`** — `avaliar(expressao) -> str`. Lógica **pura**, sem Tkinter, importável e
-  testável. Nunca levanta exceção: expressão inválida vira a string `"Erro"`.
+- **`src/expressao.py`** — Lógica **pura**, sem Tkinter, importável e testável. Duas funções:
+  - `avaliar(expressao) -> str`. Nunca levanta exceção: expressão inválida vira a string `"Erro"`.
+    Não usa `eval` — percorre a árvore do `ast.parse` com allowlist (ver "Como o cálculo é avaliado").
+  - `deve_reiniciar(visor, tecla) -> bool`. Com um resultado no visor, dígito recomeça a conta e
+    operador encadeia a partir do resultado. `"Erro"` nunca encadeia.
+  - `apagar_ultimo(visor) -> str`. Regra do botão `⌫`: tira só o último caractere. `"Erro"` é o caso
+    especial — apagar limpa o visor inteiro, porque `"Err"` não é nada.
+  - `pode_digitar(texto) -> bool`. Filtro do que o usuário pode digitar ou colar no visor
+    (`CARACTERES_DIGITAVEIS`). É a segunda camada de defesa, não a única.
 - **`src/calculadora.py`** — a UI. Não há classes nem `main()`; o arquivo é lido de cima para baixo:
-  1. `resultado_mostrado` — flag global: o visor exibe um resultado? (o próximo dígito limpa o campo)
-  2. Funções `clicar`, `resetar_se_resultado`, `limpar`, `calcular` (esta delega para `avaliar`)
-  3. Criação de `janela` e `entrada` **em nível de módulo**
-  4. Laço que gera os 16 botões a partir da lista `botoes`
-  5. `janela.mainloop()` na última linha
+  1. `resultado_mostrado` — flag global: o visor exibe um resultado?
+  2. `TRADUCAO` (rótulo `÷ × −` → operador `/ * -`) e `CORES` (paleta do tema, num lugar só)
+  3. Funções `clicar`, `resetar_se_resultado`, `limpar`, `apagar`, `calcular` (delegam para
+     `expressao.py`) e `escrever_no_visor`; mais `escolher_fonte` e `realcar_no_hover`, só apresentação
+  4. Criação de `janela` e `entrada` **em nível de módulo**, com o filtro de digitação ligado no campo
+  5. Laço que gera os 18 botões a partir da lista `botoes`, que carrega a posição na grade —
+     ela não é uniforme: `0` ocupa duas colunas, e `C`, `⌫` e `=` dividem a linha de baixo
+  6. `janela.mainloop()` na última linha
+
+### Teclado
+
+O visor é editável, então **teclado e botões precisam concordar** — e o que faz isso são dois bindings
+com papéis diferentes:
+
+| Binding | Onde | Por quê ali |
+|---|---|---|
+| `<Return>` / `<KP_Enter>` → `calcular` | na **`janela`** | vale de qualquer foco; depois de clicar num botão o foco está nele, não no visor |
+| `<Key>` → `teclou_no_visor` | no **`entrada`** | binding de widget roda ANTES do da classe, então dá para limpar o visor antes de o caractere ser inserido |
+
+`teclou_no_visor` aplica ao teclado a mesma `deve_reiniciar` dos botões: com `96` no visor, teclar `5`
+começa conta nova e teclar `+` encadeia — igual ao clique. Sem ele o campo concatenava por baixo do
+pano e virava `965`.
+
+⚠️ **Tecla que não digita nada não pode mexer no estado.** O `Enter` tem `evento.char == "\r"`; sem o
+`pode_digitar(evento.char)` na entrada da função, ele era tratado como dígito e **apertar Enter duas
+vezes limpava o visor antes de calcular, devolvendo `"Erro"`**. Mesma armadilha vale para qualquer
+tecla nova com `char` preenchido (Tab, Esc).
+
+### Aparência
+
+Tema escuro, todo declarado no dicionário `CORES` e na fonte escolhida por `escolher_fonte` (primeira
+família instalada da lista — o que existe muda entre Linux, Windows e macOS). **Mudar o tema é mexer
+nesses dois lugares**, não caçar literal no meio do arquivo.
+
+Detalhes que não são acidente:
+
+- `tk.Button` **não tem canto arredondado nem estado de hover** — não existe opção para isso no Tk puro.
+  O hover é feito à mão em `realcar_no_hover` (`<Enter>`/`<Leave>`), e canto redondo só desenhando em
+  `Canvas`, o que seria reescrever a UI inteira. Não vale.
+- O visor não tem moldura (`bd=0`, `highlightthickness=0`): quem marca a área é um `Frame` de 1px.
+- `insertbackground` deixa o cursor visível no fundo escuro — sem isso ele some.
 
 ⚠️ **`import calculadora` ainda ABRE a janela** e bloqueia no `mainloop()`. É por isso que a regra vive
 em `expressao.py`: os testes importam só esse módulo. Se um dia a UI precisar ser testada, o passo é
@@ -62,24 +108,58 @@ envolvê-la em `main()` + `if __name__ == "__main__":` — mudança estrutural, 
 
 ---
 
+## Como o cálculo é avaliado (não mexa sem ler isto)
+
+**`avaliar()` não usa `eval`.** A expressão é lida com `ast.parse(..., mode="eval")` e a árvore é
+percorrida à mão em `_calcular`, com **allowlist de nós**: `Constant` numérico (`bool` recusado de
+propósito — é subclasse de `int`), `BinOp` com `+ - * /` e `UnaryOp` com sinal. Nada é executado; os
+operadores vêm do módulo `operator`. Qualquer outro nó levanta `ValueError` e vira `"Erro"`.
+
+⚠️ **O motivo é que o visor é um `tk.Entry` comum, editável.** Dá para clicar nele, digitar e colar
+(Ctrl+V) — não são só os botões que alimentam o campo. Com `eval`, colar
+`__import__('os').system(...)` e apertar `=` executava o comando de verdade. A allowlist é o que
+sustenta a promessa de que o campo é seguro para digitar.
+
+**São duas camadas, e cada uma pega o que a outra não pega:**
+
+| Camada | Onde | O que decide | Exemplo do que só ela barra |
+|---|---|---|---|
+| Filtro de digitação | `pode_digitar`, ligado no `Entry` com `validate="key"` | o que **entra** no visor | `q` — a letra nem aparece no campo |
+| Allowlist do `ast` | `_calcular`, dentro de `avaliar` | o que é **calculável** | `2**3` — os caracteres são válidos, a operação não |
+
+⚠️ **Armadilha do `validate="key"`: o Tk valida também o que o PROGRAMA escreve no campo.** Como
+`"Erro"` tem letra, um `entrada.insert` direto seria recusado e o visor ficaria vazio no lugar da
+mensagem. É por isso que todo write da calculadora passa por `escrever_no_visor`, que desliga a
+validação, escreve e religa. **Nunca use `entrada.insert`/`delete` direto para resultado.**
+
+Consequências que valem como regra:
+
+- **Operador novo entra na allowlist, não em `eval`.** Adicionar `%` ou `**` é acrescentar a entrada em
+  `_OPERACOES_BINARIAS` e o teste correspondente — nunca afrouxar o parser.
+- **`**` está fora de propósito:** `9**9**9` roda por tempo indefinido na thread do `mainloop`, congela
+  a janela e não há como cancelar. Travado por `test_deve_devolver_erro_sem_travar_em_calculo_explosivo`.
+- **`avaliar()` nunca levanta exceção.** Cuidado com `except Exception:` se algum dia o avaliador puder
+  produzir `BaseException` — foi exatamente assim que `exit()` escapava na versão com `eval`
+  (`SystemExit` não é `Exception`). Travado por `test_nunca_deve_levantar_excecao`.
+
+---
+
 ## Armadilhas ativas (conhecidas, ainda no código)
 
-1. **`avaliar()` usa `eval()` na string do visor.** Funciona, mas `eval` executa **Python arbitrário**,
-   não só aritmética. Como o teclado da UI só produz dígitos e operadores, a exposição prática é baixa —
-   mas se algum dia o campo aceitar digitação livre ou colar do clipboard, vira execução de código. A
-   substituição correta é um parser de expressão (`ast.literal_eval` não resolve operadores; o caminho é
-   `ast.parse` com allowlist de nós, ou um avaliador próprio). **Troque o avaliador ANTES de liberar a
-   entrada, não depois.**
-
-2. **Divisão inteira vs. float:** `eval("1/2")` devolve `0.5`, mas `eval("4/2")` devolve `2.0` — o visor
-   mostra `2.0`, não `2`. Formatação de resultado nunca foi tratada. Está travado por teste
+1. **Divisão inteira vs. float:** `avaliar("1/2")` devolve `"0.5"`, mas `avaliar("4/2")` devolve `"2.0"`
+   — o visor mostra `2.0`, não `2`. Formatação de resultado nunca foi tratada. Está travado por teste
    (`test_deve_devolver_float_na_divisao_exata`): se você formatar, o teste falha de propósito, para
    forçar a decisão consciente.
 
-3. **Estado por variável global** (`resultado_mostrado`, `entrada`, `janela`). Qualquer função nova que
+2. **Estado por variável global** (`resultado_mostrado`, `entrada`, `janela`). Qualquer função nova que
    precise do visor depende do global — não há injeção.
 
-4. **Sem suporte a teclado.** Só clique; digitar números no teclado físico não faz nada.
+3. **Só o `Enter` tem atalho.** `<Return>` e `<KP_Enter>` calculam (equivalem ao `=`). `Esc` **não**
+   limpa e não há atalho para o `⌫` — quem quiser apagar pelo teclado usa o BackSpace nativo do campo.
+
+4. **A validação da digitação é por caractere, não por estrutura.** Letra não entra mais no visor
+   (`pode_digitar`), mas `1..2` e `2++` são digitáveis e só falham no `=`, virando `Erro` sem dizer
+   onde. O feedback continua sendo o mínimo: a palavra `Erro` no visor.
 
 ---
 
