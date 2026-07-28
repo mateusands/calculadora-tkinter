@@ -56,10 +56,38 @@ def apagar():
     # próximo dígito limparia o campo em vez de continuar de onde parou.
     resultado_mostrado = False
 
-def calcular():
+def calcular(_evento=None):
     global resultado_mostrado
     escrever_no_visor(avaliar(entrada.get()))
     resultado_mostrado = True
+    return "break"  # o Enter não deve fazer mais nada além de calcular
+
+def teclou_no_visor(evento):
+    """Digitação direta no visor segue a MESMA regra dos botões.
+
+    Sem isto, o teclado e os botões discordam: com `96` no visor, o botão `5`
+    começa uma conta nova (mostra `5`), mas a tecla `5` cairia no campo por
+    baixo do pano e viraria `965`.
+
+    Roda antes da inserção do Tk (é binding do widget, que vem antes do da
+    classe): decide o que fazer com o visor, e o caractere entra depois.
+    """
+    global resultado_mostrado
+    if not resultado_mostrado:
+        return None
+    if evento.keysym in ("BackSpace", "Delete"):
+        # Apagou: o que sobrar é expressão em edição, não mais um resultado.
+        resultado_mostrado = False
+        return None
+    # Só tecla que REALMENTE entra no campo mexe no estado do visor. Sem este
+    # filtro, o `\r` do Enter era tratado como dígito: apertar Enter duas vezes
+    # limpava o visor antes de calcular e devolvia "Erro".
+    if not evento.char or not pode_digitar(evento.char):
+        return None  # Enter, Shift, Ctrl, setas — não é digitação
+    if deve_reiniciar(entrada.get(), evento.char):
+        escrever_no_visor("")
+    resultado_mostrado = False
+    return None
 
 def escrever_no_visor(texto):
     """Troca o conteúdo do visor SEM passar pelo filtro de digitação.
@@ -126,6 +154,15 @@ entrada.configure(
     validatecommand=(janela.register(pode_digitar), "%P"),
 )
 
+# Enter calcula, de qualquer lugar da janela (por isso o bind é na `janela`, e
+# não no campo: depois de clicar num botão, o foco está nele, não no visor).
+# `<KP_Enter>` é o Enter do teclado numérico, que é uma tecla diferente.
+janela.bind("<Return>", calcular)
+janela.bind("<KP_Enter>", calcular)
+
+# Já o ajuste do estado do visor é do campo: precisa rodar ANTES de o Tk
+# inserir o caractere, e binding de widget vem antes do binding de classe.
+entrada.bind("<Key>", teclou_no_visor)
 
 # Filete no lugar da borda do Entry — marca o visor sem enquadrá-lo.
 tk.Frame(area_visor, bg=CORES["linha"], height=1).pack(fill="x", pady=(10, 0))
