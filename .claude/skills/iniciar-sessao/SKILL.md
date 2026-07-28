@@ -12,7 +12,8 @@ A fonte da verdade é **o código**.
 Antes de qualquer ação, execute os passos de leitura abaixo:
 
 1. **Leia o `CLAUDE.md` da raiz** — propósito, stack, como o código está organizado e, principalmente,
-   a seção **"Armadilhas ativas"** (`eval`, formatação do resultado, estado global, sem teclado).
+   as seções **"Como o cálculo é avaliado"** (allowlist do `ast`, visor editável) e **"Armadilhas
+   ativas"** (formatação do resultado, estado global, sem atalho de teclado, sem validação na digitação).
 
 2. **Leia a última sessão**, se houver: `.claude/sessions/` (arquivo mais recente).
 

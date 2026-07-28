@@ -25,9 +25,9 @@ O objetivo agora **não é codar**, e sim consolidar o que a sessão mudou.
 
 Avalie se a sessão mudou algo que o `CLAUDE.md` afirma. Gatilhos:
 
-- **Armadilha resolvida** — trocou o `eval` por um avaliador seguro? Corrigiu o `except:` pelado? Passou
-  a formatar o resultado? **Remova o item da seção "Armadilhas ativas"**. Documento que descreve bug já
-  corrigido induz o próximo leitor ao erro.
+- **Armadilha resolvida** — passou a formatar o resultado? Ligou atalho de teclado (`Enter`/`Esc`)?
+  **Remova o item da seção "Armadilhas ativas"**. Documento que descreve bug já corrigido induz o
+  próximo leitor ao erro.
 - **Armadilha nova descoberta** — acrescente. É o conteúdo mais valioso do arquivo.
 - **Dependência introduzida** — o `CLAUDE.md` afirma "zero dependências externas" em três lugares
   (stack, estrutura, regras). Se isso mudou, atualize todos.

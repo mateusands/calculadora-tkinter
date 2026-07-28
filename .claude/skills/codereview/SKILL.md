@@ -23,10 +23,14 @@ Atue como Engenheiro Sênior e revise criticamente as **últimas mudanças deste
   é o único canal de erro. Exceção escapando derruba o callback e deixa a janela viva porém inerte.
 - **Regra de negócio que foi parar em `calculadora.py`** em vez de `expressao.py`: fica intestável, porque
   aquele módulo abre a janela ao ser importado. Aponte a realocação.
-- **`eval()` com entrada mais ampla:** o diff permite que algo além dos botões chegue ao campo — digitação
-  por teclado físico, colar do clipboard, histórico editável, arquivo de configuração? Se sim, `eval`
-  deixou de ser "só aritmética" e virou **execução de código Python arbitrário**. Reporte no topo, com a
-  alternativa (`ast.parse` + allowlist de nós).
+- **Allowlist do avaliador:** o diff voltou a usar `eval`/`exec`, ou afrouxou a allowlist de `_calcular`
+  (aceitou `Call`, `Name`, `Attribute`, `Compare`, constante não numérica)? Reporte **no topo**. O visor é
+  um `Entry` editável — o usuário digita e cola nele, então qualquer folga ali é execução de código
+  Python arbitrário, não hipótese. Operador novo se acrescenta a `_OPERACOES_BINARIAS`/`_OPERACOES_UNARIAS`
+  com teste; nunca abrindo o parser.
+- **`except` largo demais no avaliador:** `except BaseException` esconderia `KeyboardInterrupt`; um
+  `except Exception` deixa passar `SystemExit` se algum dia o avaliador puder produzi-lo — foi assim que
+  `exit()` escapava na versão com `eval`.
 - **Formatação do resultado:** mudança que passe a formatar precisa cobrir `float` grande, notação
   científica e o caso `0.1 + 0.2`.
 - **Flag `resultado_mostrado`:** toda função nova que escreve no visor decide o que fazer com ela? Se
@@ -60,8 +64,16 @@ Atue como Engenheiro Sênior e revise criticamente as **últimas mudanças deste
   todos os botões chamam com o valor da última iteração — bug clássico e difícil de ver.
 - **Global novo:** o diff acrescentou variável global? Já há três (`resultado_mostrado`, `entrada`,
   `janela`). Cada nova aumenta o acoplamento; questione se não cabe parâmetro.
-- **Duplicação de literal:** cores (`#2c3e50`, `#8e44ad`…) e fontes estão repetidas inline. Se o diff
-  adiciona mais uma cópia, sugira a constante — mas sem transformar isso em refatoração geral não pedida.
+- **Cor ou fonte fora do dicionário `CORES` / da variável `fonte`:** o tema está centralizado justamente
+  para poder ser trocado num lugar só. Literal `#rrggbb` solto no meio do arquivo é regressão.
+- **Rótulo tipográfico chegando ao avaliador:** operador novo precisa entrar em `TRADUCAO`, e a tradução
+  tem de acontecer **antes** de `resetar_se_resultado` — senão `deve_reiniciar` não reconhece a tecla
+  como operador e o encadeamento quebra sem erro nenhum.
+- **`entrada.insert`/`delete` direto para escrever resultado:** tem de passar por `escrever_no_visor`.
+  O `Entry` valida por tecla, e a validação vale também para o que o programa escreve — `"Erro"` tem
+  letra e seria recusado, deixando o visor vazio no lugar da mensagem.
+- **Caractere novo aceito no visor** (`CARACTERES_DIGITAVEIS`): confira se o avaliador realmente sabe
+  lidar com ele. O filtro não substitui a allowlist do `ast`, e vice-versa.
 - **Consistência com o arquivo:** o projeto é procedural, em português, sem classes. Código novo em outro
   paradigma no meio do arquivo é pior que código consistente e imperfeito.
 
@@ -83,5 +95,5 @@ Atue como Engenheiro Sênior e revise criticamente as **últimas mudanças deste
 
 - Nada de micro-otimização irrelevante.
 - Para cada problema: **arquivo e linha**, impacto, e o código refatorado. Ordene por severidade —
-  correção do cálculo e ampliação da superfície do `eval` vêm primeiro.
+  correção do cálculo e folga na allowlist do avaliador vêm primeiro.
 - **Apenas revise e reporte. Não aplique as correções** sem ordem explícita.
