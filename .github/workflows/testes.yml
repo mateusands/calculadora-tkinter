@@ -1,0 +1,22 @@
+name: testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      # Só pytest: o app é stdlib-only e a suíte cobre `expressao.py`, que não
+      # importa Tkinter — por isso o runner não precisa do Tk nem de display.
+      - run: pip install -r requirements-dev.txt
+
+      - run: pytest
