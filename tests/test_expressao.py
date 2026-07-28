@@ -13,10 +13,14 @@ POR QUE EXISTE
   este módulo é o que destrava o TDD no projeto.
 
 REGRA DE NEGÓCIO
-  - O botão rotulado "X" já chega aqui como "*" (a tradução é da camada de UI).
+  - Os botões mostram "÷ × −", mas chegam aqui como "/ * -": a tradução é da
+    camada de UI (dicionário TRADUCAO, em calculadora.py). Símbolo tipográfico
+    nunca chega ao avaliador.
   - Divisão devolve float: "4/2" resulta em "2.0", não "2". É o comportamento
     atual, herdado do `eval`, e está documentado como pendência no CLAUDE.md.
   - Qualquer erro (sintaxe, divisão por zero, nome desconhecido) vira "Erro".
+  - Apagar é caractere a caractere (botão ⌫), diferente do "C", que zera tudo.
+    "Erro" é a exceção: não é expressão, então apagar limpa o visor inteiro.
   - SÓ ARITMÉTICA das quatro operações (+ - * /), com sinal unário. Qualquer
     outra construção Python — chamada de função, comparação, potência, texto,
     nome — é expressão inválida e vira "Erro". A calculadora não é um
@@ -26,7 +30,7 @@ REGRA DE NEGÓCIO
 
 import pytest
 
-from expressao import RESULTADO_ERRO, avaliar, deve_reiniciar
+from expressao import RESULTADO_ERRO, apagar_ultimo, avaliar, deve_reiniciar
 
 
 class TestOperacoesBasicas:
@@ -156,3 +160,37 @@ class TestReinicioDoVisorAposResultado:
 
     def test_deve_permitir_encadear_resultado_negativo(self):
         assert deve_reiniciar("-10", "*") is False
+
+
+class TestApagarUltimoCaractere:
+    """O ⌫ corrige o último toque; o C zera tudo. São botões diferentes.
+
+    Sem o ⌫, errar um dígito no meio de `1234+567` obrigava a refazer a conta
+    inteira — era a única forma de apagar.
+    """
+
+    @pytest.mark.parametrize(
+        "visor, esperado",
+        [
+            ("123", "12"),
+            ("12+3", "12+"),  # apaga o dígito, o operador continua lá
+            ("12+", "12"),  # apaga o operador
+            ("1.5", "1."),  # apaga o dígito, o ponto continua lá
+            ("7", ""),  # último caractere deixa o visor vazio
+        ],
+    )
+    def test_deve_apagar_apenas_o_ultimo_caractere(self, visor, esperado):
+        assert apagar_ultimo(visor) == esperado
+
+    def test_deve_limpar_o_visor_inteiro_quando_mostra_erro(self):
+        # Apagar uma letra de "Erro" deixaria "Err", que não é expressão nem
+        # mensagem — é lixo que só some no C.
+        assert apagar_ultimo(RESULTADO_ERRO) == ""
+
+    def test_deve_devolver_vazio_quando_o_visor_ja_esta_vazio(self):
+        # O ⌫ apertado à toa não pode quebrar nada.
+        assert apagar_ultimo("") == ""
+
+    def test_deve_permitir_corrigir_um_resultado(self):
+        # 12×8= mostra 96; o ⌫ deixa 9, que segue sendo o começo de outra conta.
+        assert apagar_ultimo("96") == "9"

@@ -1,7 +1,7 @@
 import tkinter as tk
 import tkinter.font as tkfont
 
-from expressao import avaliar, deve_reiniciar
+from expressao import apagar_ultimo, avaliar, deve_reiniciar
 
 resultado_mostrado = False
 
@@ -27,6 +27,7 @@ CORES = {
     "limpar": "#262a34",
     "limpar_hover": "#3b2a2f",
     "limpar_texto": "#ff7b72",
+    "apagar_texto": "#aeb6c4",  # cinza: apagar um toque não é destrutivo como o C
 }
 
 def clicar(valor):
@@ -48,6 +49,13 @@ def limpar():
     entrada.delete(0, tk.END)
     resultado_mostrado = False
 
+def apagar():
+    global resultado_mostrado
+    visor = apagar_ultimo(entrada.get())
+    entrada.delete(0, tk.END)
+    entrada.insert(tk.END, visor)
+    # O que sobrou virou expressão em edição, não resultado — sem isto, o
+    # próximo dígito limparia o campo em vez de continuar de onde parou.
     resultado_mostrado = False
 
 def calcular():
@@ -122,7 +130,7 @@ botoes = [
     ("4", "num", 1, 0, 1), ("5", "num", 1, 1, 1), ("6", "num", 1, 2, 1), ("×", "op", 1, 3, 1),
     ("1", "num", 2, 0, 1), ("2", "num", 2, 1, 1), ("3", "num", 2, 2, 1), ("−", "op", 2, 3, 1),
     ("0", "num", 3, 0, 2), (".", "num", 3, 2, 1), ("+", "op", 3, 3, 1),
-    ("C", "limpar", 4, 0, 2), ("=", "eq", 4, 2, 2),
+    ("C", "limpar", 4, 0, 1), ("⌫", "apagar", 4, 1, 1), ("=", "eq", 4, 2, 2),
 ]
 
 # tipo -> (cor, cor no hover, cor do texto, corpo da fonte)
@@ -131,9 +139,10 @@ estilo_por_tipo = {
     "op": (CORES["operador"], CORES["operador_hover"], CORES["operador_texto"], "bold"),
     "eq": (CORES["igual"], CORES["igual_hover"], CORES["igual_texto"], "bold"),
     "limpar": (CORES["limpar"], CORES["limpar_hover"], CORES["limpar_texto"], "bold"),
+    "apagar": (CORES["numero"], CORES["numero_hover"], CORES["apagar_texto"], "normal"),
 }
 
-acoes_por_tipo = {"eq": calcular, "limpar": limpar}
+acoes_por_tipo = {"eq": calcular, "limpar": limpar, "apagar": apagar}
 
 for texto, tipo, linha, coluna, colunas in botoes:
     cor, cor_hover, cor_texto, corpo = estilo_por_tipo[tipo]
@@ -144,7 +153,7 @@ for texto, tipo, linha, coluna, colunas in botoes:
     botao = tk.Button(
         grade,
         text=texto,
-        font=(fonte, 18 if tipo == "op" else 16, corpo),
+        font=(fonte, 18 if tipo in ("op", "apagar") else 16, corpo),
         bg=cor,
         fg=cor_texto,
         activebackground=cor_hover,

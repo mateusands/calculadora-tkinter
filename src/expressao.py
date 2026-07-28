@@ -62,6 +62,20 @@ def deve_reiniciar(visor: str, tecla: str) -> bool:
     return not _e_numero(visor)
 
 
+def apagar_ultimo(visor: str) -> str:
+    """Devolve o visor sem o último caractere — é a regra do botão ⌫.
+
+    Diferente do "C", que zera tudo: aqui só o último toque é desfeito, para
+    corrigir um dígito sem refazer a conta inteira.
+
+    "Erro" é o caso especial: não é expressão, é mensagem. Apagar uma letra
+    deixaria "Err" no visor, que não é nada — então o visor inteiro é limpo.
+    """
+    if visor == RESULTADO_ERRO:
+        return ""
+    return visor[:-1]
+
+
 def _calcular(no: ast.AST) -> float:
     """Percorre a árvore recusando tudo que não seja aritmética.
 
